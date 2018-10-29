@@ -1,37 +1,64 @@
-## Welcome to GitHub Pages
+PowerShell Ransomware - Writeup
+Sep 17, 2018
 
-You can use the [editor on GitHub](https://github.com/s0wr0b1ndef/LetmeByPASS/edit/master/index.md) to maintain and preview the content for your website in Markdown files.
+Introduction
+This is the write-up for PowerShell Ransomware, a CTF challenge presented at CTF Fatec Ourinhos 2018 2nd edition.
 
-Whenever you commit to this repository, GitHub Pages will run [Jekyll](https://jekyllrb.com/) to rebuild the pages in your site, from the content in your Markdown files.
+Challenge Information
+Name: PowerShell Ransomware
 
-### Markdown
+Description: The flag has been taken for ransom. But I got the source-code, maybe you can decrypt it?
 
-Markdown is a lightweight and easy-to-use syntax for styling your writing. It includes conventions for
+Analysis
+Look at the following source-code:
 
-```markdown
-Syntax highlighted code block
+function AllYourFilesAreBelongToMe
+{
+    Param(
+        [Parameter(Mandatory = $true, Position = 0)]
+        [int]$EncryptionKey
+    )
 
-# Header 1
-## Header 2
-### Header 3
+    Get-ChildItem .\flag.txt | % { 
+        $EncryptedData = "";
+        (Get-Content -Encoding ASCII $_.FullName).ToCharArray() | % {
+            $EncryptedData += [char]($_ -bxor $EncryptionKey)
+   
+        }
+        Set-Content -Path $_.FullName -Value $EncryptedData
+        Write-Output "All Your Files Are Belong To Me Now!"
+    }
+}
+This takes a number (key) named $EncryptionKey and uses XOR to “encrypt” a file content. Let’s modify this script so we can use it against itself.
 
-- Bulleted
-- List
+function AllYourFilesAreBelongToMe
+{
+    Param(
+        [Parameter(Mandatory = $true, Position = 0)]
+        [int]$EncryptionKey
+    )
 
-1. Numbered
-2. List
+    Get-ChildItem .\flag.txt | % { 
+        $EncryptedData = "";
+        (Get-Content -Encoding ASCII $_.FullName).ToCharArray() | % {
+            $EncryptedData += [char]($_ -bxor $EncryptionKey)
+   
+        }
+        Write-Output $EncryptedData
+    }
+}
+As you can see, I removed the last two lines from function and used Write-Output to show us the content of the encrypted data instead of overwriting the file content. Now load our code to a PowerShell terminal:
 
-**Bold** and _Italic_ and `Code` text
+Screenshot
 
-[Link](url) and ![Image](src)
-```
+As you already might know, if you XOR something with a single byte key, you can reveal it’s original content by XORing the encrypted value against the same key.
 
-For more details see [GitHub Flavored Markdown](https://guides.github.com/features/mastering-markdown/).
+We must now brute-force against 255 and below numbers, because it is impossible to be bigger than 255 (because a single byte XOR key is used).
 
-### Jekyll Themes
+Looping from 255 to 0, we are able to XOR against all possible keys:
 
-Your Pages site will use the layout and styles from the Jekyll theme you have selected in your [repository settings](https://github.com/s0wr0b1ndef/LetmeByPASS/settings). The name of this theme is saved in the Jekyll `_config.yml` configuration file.
+Screenshot
 
-### Support or Contact
+And scrolling down a little more, we get our flag on $EncryptionKey 51!
 
-Having trouble with Pages? Check out our [documentation](https://help.github.com/categories/github-pages-basics/) or [contact support](https://github.com/contact) and we’ll help you sort it out.
+Screenshot
